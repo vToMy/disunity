@@ -16,6 +16,7 @@ import info.ata4.disunity.extract.FontExtractor;
 import info.ata4.disunity.extract.MovieTextureExtractor;
 import info.ata4.disunity.extract.ShaderExtractor;
 import info.ata4.disunity.extract.TextAssetExtractor;
+import info.ata4.disunity.extract.Texture2DExtractor;
 import info.ata4.io.util.PathUtils;
 import info.ata4.unity.asset.AssetFile;
 import info.ata4.unity.rtti.ObjectData;
@@ -43,6 +44,7 @@ public class ExtractCommand extends AssetFileCommand {
         extractors.add(new AudioClipExtractor());
         extractors.add(new MovieTextureExtractor());
         extractors.add(new FontExtractor());
+        extractors.add(new Texture2DExtractor());
     }
 
     @Override
