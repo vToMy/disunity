@@ -35,7 +35,7 @@ public class ObjectSerializer {
     private static final int ALIGNMENT = 4;
     
     /** Spare bytes allocated to serialize objects, since padding ruins output size predictability. */
-    private static final int SPARE = 1000;
+    private int spare;
     
     private ByteBuffer soundData;
     private VersionInfo versionInfo;
@@ -48,6 +48,14 @@ public class ObjectSerializer {
         this.soundData = soundData;
     }
     
+    public void setSpare(int value) {
+    	spare = value;
+    }
+    
+    public int getSpare() {
+    	return spare;
+    }
+    
     public void serialize(ObjectData data) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
     }
@@ -55,7 +63,7 @@ public class ObjectSerializer {
     public void serialize(ObjectData data, int delta) throws IOException {
         versionInfo = data.versionInfo();
         
-        ByteBuffer buff = ByteBuffer.allocate(data.buffer().limit() + delta + SPARE);
+        ByteBuffer buff = ByteBuffer.allocate(data.buffer().limit() + delta + spare);
         DataWriter out = DataWriters.forByteBuffer(buff);
         out.order(versionInfo.order());
         out.position(0);

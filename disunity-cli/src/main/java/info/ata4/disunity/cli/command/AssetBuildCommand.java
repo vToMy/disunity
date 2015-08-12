@@ -15,6 +15,7 @@ import java.util.logging.Logger;
 
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
+import com.beust.jcommander.converters.IntegerConverter;
 
 import info.ata4.disunity.builder.AssetBuilder;
 import info.ata4.disunity.builder.FontBuilder;
@@ -36,7 +37,6 @@ import info.ata4.unity.rtti.ObjectSerializer;
 	)
 public class AssetBuildCommand extends SingleFileCommand {
 
-	public static final int SPARE = 1000;
 	private static final Logger L = LogUtils.getLogger();
 	
 	@Parameter(
@@ -53,6 +53,20 @@ public class AssetBuildCommand extends SingleFileCommand {
     )
 	private Path originalAsset;
 	
+	@Parameter(
+		names = {"-s", "--spare"},
+		description = "Spare byte buffer for assesing the asset file size.",
+		converter = IntegerConverter.class
+    )
+	private int spare = 1000;
+	
+	@Parameter(
+		names = {"-s2", "--spare2"},
+		description = "Spare byte buffer for assesing serialized object size.",
+		converter = IntegerConverter.class
+    )
+	private int spare2 = 1000;
+	
 	@Override
 	public void handleFile(Path file) throws IOException {
 		if (originalAsset == null) {
@@ -66,6 +80,7 @@ public class AssetBuildCommand extends SingleFileCommand {
 		assetFile.load(originalAsset);
 		ObjectSerializer serializer = new ObjectSerializer();
 		serializer.setSoundData(assetFile.getAudioBuffer());
+		serializer.setSpare(spare2);
 		
 		List<AssetBuilder> builders = Arrays.<AssetBuilder>asList(
 				new TextAssetBuilder(file, serializer),
@@ -88,7 +103,7 @@ public class AssetBuildCommand extends SingleFileCommand {
 		
 		L.log(Level.INFO, "Repacked: {0} files.", amount);
 		
-		int size = (int) (assetFile.header().fileSize() + deltaSum + SPARE);
+		int size = (int) (assetFile.header().fileSize() + deltaSum + spare);
 		ByteBuffer outputBuffer = ByteBuffer.allocate(size);
 		assetFile.save(new DataWriter(new ByteBufferSource(outputBuffer)));
 		
