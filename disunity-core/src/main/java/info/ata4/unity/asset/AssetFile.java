@@ -70,6 +70,10 @@ public class AssetFile extends FileHandler {
     // misc fields
     private ByteBuffer audioBuffer;
     
+    public ByteBuffer getAudioBuffer() {
+    	return audioBuffer;
+    }
+    
     @Override
     public void load(Path file) throws IOException {
         sourceFile = file;

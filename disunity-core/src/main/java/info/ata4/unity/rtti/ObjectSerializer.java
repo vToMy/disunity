@@ -11,14 +11,18 @@ package info.ata4.unity.rtti;
 
 import info.ata4.io.DataReader;
 import info.ata4.io.DataReaders;
+import info.ata4.io.DataWriter;
+import info.ata4.io.DataWriters;
 import info.ata4.io.buffer.ByteBufferUtils;
 import info.ata4.unity.asset.Type;
 import info.ata4.unity.asset.TypeNode;
 import info.ata4.unity.asset.VersionInfo;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -29,6 +33,9 @@ public class ObjectSerializer {
     
     private static final boolean DEBUG = false;
     private static final int ALIGNMENT = 4;
+    
+    /** Spare bytes allocated to serialize objects, since padding ruins output size predictability. */
+    private static final int SPARE = 1000;
     
     private ByteBuffer soundData;
     private VersionInfo versionInfo;
@@ -43,6 +50,29 @@ public class ObjectSerializer {
     
     public void serialize(ObjectData data) throws IOException {
         throw new UnsupportedOperationException("Not supported yet.");
+    }
+    
+    public void serialize(ObjectData data, int delta) throws IOException {
+        versionInfo = data.versionInfo();
+        
+        ByteBuffer buff = ByteBuffer.allocate(data.buffer().limit() + delta + SPARE);
+        DataWriter out = DataWriters.forByteBuffer(buff);
+        out.order(versionInfo.order());
+        out.position(0);
+        
+        TypeNode typeNode = data.typeTree();
+        FieldNode instance = data.instance();
+        data.instance(null);
+        writeObject(out, typeNode, instance);
+        
+        buff = ByteBufferUtils.getSlice(buff, 0, buff.position());
+        
+        // check if all bytes have been written
+        //if (out.hasRemaining()) {
+            //throw new RuntimeTypeException("Remaining bytes: " + out.remaining());
+        //}
+        
+        data.buffer(buff);
     }
     
     public void deserialize(ObjectData data) throws IOException {
@@ -248,4 +278,150 @@ public class ObjectSerializer {
                 return list;
         }
     }
+    
+    private void writeObject(DataWriter out, TypeNode typeNode, FieldNode fieldNode) throws IOException {
+        Type type = typeNode.type();
+        
+        // if the type has no children, it has a primitve value
+        if (typeNode.isEmpty() && type.size() > 0) {
+        	writePrimitiveValue(out, type, -1, fieldNode.getValue());
+        }
+        
+        // write object fields
+        for (TypeNode childTypeNode : typeNode) {
+            Type childType = childTypeNode.type();
+            
+            // Check if the current node is an array and if the current field is
+            // "data". In that case, "data" needs to be written "size" times.
+            if (type.isArray() && childType.fieldName().equals("data")) {
+                int size = fieldNode.getSInt32("size");
+                
+                FieldNode childFieldNode = fieldNode.getChild(childType.fieldName());
+
+                // if the child type has no children, it has a primitve array
+                if (childTypeNode.isEmpty()) {
+                	writePrimitiveValue(out, childType, size, childFieldNode.getValue());
+                } else {
+                    // write list of object nodes
+                    List<FieldNode> childFieldNodes = (List<FieldNode>) childFieldNode.getValue();
+                    for (int i = 0; i < size; i++) {
+                    	writeObject(out, childTypeNode, childFieldNodes.get(i));
+                    }
+                }
+            } else {
+            	writeObject(out, childTypeNode, fieldNode.getChild(childType.fieldName()));
+            }
+        }
+    }
+	
+	
+    private void writePrimitiveValue(DataWriter out, Type type, int size, Object object) throws IOException, RuntimeTypeException {
+        if (size == -1) {
+        	writePrimitive(out, type, object);
+        	if (type.isForceAlign()) {
+        		out.align(ALIGNMENT);
+        	}
+        } else {
+        	writePrimitiveArray(out, type, size, object);
+        	if (versionInfo.assetVersion() > 5) {
+        		out.align(ALIGNMENT);
+        	}
+        }
+    }
+	
+	private void writePrimitiveArray(DataWriter out, Type type, int size, Object object) throws IOException, RuntimeTypeException {
+        switch (type.typeName()) {
+            case "SInt8":
+            case "UInt8":
+                ByteBuffer buf = (ByteBuffer) object;
+                
+                long remaining = out.remaining();
+                if (size > remaining && remaining == 4) {
+                    int offset = 0; //that info isn't being store on read.
+                    out.writeInt(offset);
+                    if (soundData != null) {
+                    	soundData.put(buf.array(), offset, size);
+                    } else {
+                        //Nothing to do.
+                    }
+                } else {
+                	out.writeBuffer(buf);
+                }
+                break;
+
+            case "char":
+            	ByteBuffer buff = (ByteBuffer) object;
+            	out.writeBuffer(buff);
+            	break;
+
+            default:
+            	List list = (List) object;
+            	for (int i = 0; i < list.size(); i++) {
+            		writePrimitive(out, type, list.get(i));
+            	}
+            	break;
+        }
+    }
+	
+	private void writePrimitive(DataWriter out, Type type, Object object) throws IOException {
+		switch (type.typeName()) {
+        // 1 byte
+        case "bool":
+        	out.writeBoolean((Boolean)object);
+        	break;
+
+        case "SInt8":
+        	out.writeByte((Byte)object);
+        	break;
+
+        case "UInt8":
+        case "char":
+        	out.writeUnsignedByte((Integer)object);
+        	break;
+
+        // 2 bytes
+        case "SInt16":
+        case "short":
+        	out.writeShort((Short)object);
+        	break;
+
+        case "UInt16":
+        case "unsigned short":
+        	out.writeUnsignedShort((Integer)object);
+        	break;
+
+        // 4 bytes
+        case "SInt32":
+        case "int":
+        	out.writeInt((Integer)object);
+        	break;
+
+        case "UInt32":
+        case "unsigned int":
+			out.writeUnsignedInt((Long)object);
+			break;
+
+        case "float":
+        	out.writeFloat((Float)object);
+        	break;
+
+        // 8 bytes
+        case "SInt64":
+        case "long":
+        	out.writeLong((Long)object);;
+        	break;
+
+        case "UInt64":
+        case "unsigned long":
+        	out.writeUnsignedLong((BigInteger)object);
+        	break;
+
+        case "double":
+        	out.writeDouble((Double)object);
+        	break;
+
+        default:
+            throw new RuntimeTypeException("Unknown primitive type: " + type.typeName());
+		}
+	}
 }
