@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -33,7 +34,7 @@ import info.ata4.unity.rtti.ObjectSerializer;
 	    commandNames = "asset-build",
 	    commandDescription = "Builds an asset from a directory."
 	)
-public class AssetsBuildCommand extends SingleFileCommand {
+public class AssetBuildCommand extends SingleFileCommand {
 
 	public static final int SPARE = 1000;
 	private static final Logger L = LogUtils.getLogger();
@@ -56,6 +57,9 @@ public class AssetsBuildCommand extends SingleFileCommand {
 	public void handleFile(Path file) throws IOException {
 		if (originalAsset == null) {
 			originalAsset = file.resolveSibling(file.getFileName().toString().substring(1));
+		}
+		if (outFile == null) {
+			outFile = file.resolveSibling(Paths.get("out.assets"));
 		}
 		
 		AssetFile assetFile = new AssetFile();
@@ -99,14 +103,9 @@ public class AssetsBuildCommand extends SingleFileCommand {
 		
 	}
 	
-	public static void repack(Path assetPath, Path inputDirectory, Path outputFile) throws IOException {
-		
-	}
-	
 	public static long getRealSize(AssetFile assetFile) {
 		List<ObjectInfo> objectsInfo = new ArrayList<ObjectInfo>(assetFile.objectInfoMap().values());
 		ObjectInfo lastObjectInfo = objectsInfo.get(objectsInfo.size()-1);
 		return assetFile.header().dataOffset() + lastObjectInfo.offset() + lastObjectInfo.length();
 	}
-
 }
