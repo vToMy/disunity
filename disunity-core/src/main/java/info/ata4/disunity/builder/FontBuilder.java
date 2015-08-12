@@ -29,14 +29,19 @@ public class FontBuilder extends AbstractAssetBuilder<FontExtractor> {
 		Font font = new Font(instance);
 		
 		String fileName = font.getName() + ".ttf";
-		L.log(Level.INFO, "Repacking: {0}.", fileName);
 		
-		Path filePath = inputDirectory.resolve(fileName);
 		ByteBuffer originalBuffer = font.getFontData();
 		if (ByteBufferUtils.isEmpty(originalBuffer)) {
 			L.log(Level.WARNING, "{0} is empty.", fileName);
 			return 0;
 		}
+		Path filePath = inputDirectory.resolve(fileName);
+		if (!filePath.toFile().exists()) {
+			L.log(Level.WARNING, "{0} doesn't exist. Skipping.", fileName);
+			return 0;
+		}
+		L.log(Level.INFO, "Repacking: {0}.", fileName);
+		
 		ByteBuffer byteBuffer = ByteBuffer.wrap(Files.readAllBytes(filePath));
 		int delta = byteBuffer.limit() - originalBuffer.limit();
 		

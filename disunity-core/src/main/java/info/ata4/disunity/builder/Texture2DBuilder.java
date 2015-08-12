@@ -36,7 +36,6 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
 		
 		String extension = getTextureExtension(texture2DAsset);
 		String fileName = objectData.name() + "." + extension;
-		L.log(Level.INFO, "Repacking: {0}.", fileName);
 		
 		ByteBuffer originalBuffer = texture2DAsset.getImageBuffer();
 		if (ByteBufferUtils.isEmpty(originalBuffer)) {
@@ -54,7 +53,11 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
 		} else {
 			throw new IOException(String.format("Unsupported texture format: %s.", extension));
 		}
+		if (byteBuffer == null) {
+			return 0;
+		}
 		byteBuffer.rewind();
+		L.log(Level.INFO, "Repacking: {0}.", fileName);
 		
 		int delta = byteBuffer.limit() - originalBuffer.limit();
 		instance.setSInt32("m_CompleteImageSize", byteBuffer.limit());
@@ -85,7 +88,12 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
                     if (tex.isMipMap() && assetExtractor.isTargaSaveMipMaps()) {
                         fileName += "_mip_" + j;
                     }
-					Path filePath = inputDirectory.resolve(fileName + "." + getTextureExtension(tex));
+                    fileName += "." + getTextureExtension(tex);
+					Path filePath = inputDirectory.resolve(fileName);
+					if (!filePath.toFile().exists()) {
+						L.log(Level.WARNING, "{0} doesn't exist. Skipping.", fileName);
+						return null;
+					}
 					ByteBuffer data = ByteBufferUtils.getSlice(ByteBuffer.wrap(Files.readAllBytes(filePath)), TGAHeader.SIZE);
 					byteBuffers.add(data);
 					totalSize += data.limit();
@@ -125,7 +133,12 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
             mipMapCount = getMipMapCount(tex.getWidth(), tex.getHeight());
         }
         
-        Path filePath = inputDirectory.resolve(tex.getName() + "." + getTextureExtension(tex));
+        String fileName = tex.getName() + "." + getTextureExtension(tex);
+        Path filePath = inputDirectory.resolve(fileName);
+		if (!filePath.toFile().exists()) {
+			L.log(Level.WARNING, "{0} doesn't exist. Skipping.", fileName);
+			return null;
+		}
         ByteBuffer data = ByteBuffer.wrap(Files.readAllBytes(filePath));
         ByteBuffer buffer = ByteBuffer.allocate(data.limit() - KTXHeader.SIZE - mipMapCount * Integer.BYTES);
         
@@ -146,7 +159,12 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
 	}
 	
 	private ByteBuffer getDDSData(Texture2D tex) throws IOException {
-		Path filePath = inputDirectory.resolve(tex.getName() + "." + getTextureExtension(tex));
+		String fileName = tex.getName() + "." + getTextureExtension(tex);
+		Path filePath = inputDirectory.resolve(fileName);
+		if (!filePath.toFile().exists()) {
+			L.log(Level.WARNING, "{0} doesn't exist. Skipping.", fileName);
+			return null;
+		}
 		ByteBuffer data = ByteBufferUtils.getSlice(ByteBuffer.wrap(Files.readAllBytes(filePath)),DDSHeader.SIZE);
 		return data;
 	}

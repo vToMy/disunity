@@ -33,14 +33,19 @@ public class TextAssetBuilder extends AbstractAssetBuilder<TextAssetExtractor> {
 		TextAsset textAsset = new TextAsset(instance);
 		
 		String fileName = textAsset.getName() + "." + getExtension();
-		L.log(Level.INFO, "Repacking: {0}.", fileName);
 		
-		Path filePath = inputDirectory.resolve(fileName);
 		ByteBuffer originalBuffer = textAsset.getScriptRaw();
 		if (ByteBufferUtils.isEmpty(originalBuffer)) {
 			L.log(Level.WARNING, "{0} is empty.", fileName);
 			return 0;
 		}
+		Path filePath = inputDirectory.resolve(fileName);
+		if (!filePath.toFile().exists()) {
+			L.log(Level.WARNING, "{0} doesn't exist. Skipping.", fileName);
+			return 0;
+		}
+		L.log(Level.INFO, "Repacking: {0}.", fileName);
+		
 		ByteBuffer byteBuffer = ByteBuffer.wrap(Files.readAllBytes(filePath));
 		int delta = byteBuffer.limit() - originalBuffer.limit();
 		
