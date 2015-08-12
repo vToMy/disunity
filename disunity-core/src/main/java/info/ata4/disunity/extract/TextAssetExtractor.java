@@ -34,9 +34,9 @@ public class TextAssetExtractor extends AbstractAssetExtractor {
 
     @Override
     public void extract(ObjectData objectData) throws IOException {
-        TextAsset shader = new TextAsset(objectData.instance());
-        String name = shader.getName();
-        ByteBuffer script = shader.getScriptRaw();
+        TextAsset text = new TextAsset(objectData.instance());
+        String name = text.getName();
+        ByteBuffer script = text.getScriptRaw();
         
         String ext;
         String assetType;

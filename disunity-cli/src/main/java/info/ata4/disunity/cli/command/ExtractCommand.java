@@ -32,7 +32,7 @@ import java.util.List;
  */
 @Parameters(
     commandNames = "extract",
-    commandDescription = "Test"
+    commandDescription = "Extracts an assets file."
 )
 public class ExtractCommand extends AssetFileCommand {
     
