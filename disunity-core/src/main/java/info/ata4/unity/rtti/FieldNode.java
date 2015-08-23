@@ -88,17 +88,16 @@ public class FieldNode extends Node<FieldNode> {
     public void setArrayData(Object value) {
         FieldNode arrayField = getChild("Array");
         if (arrayField == null) {
-            FieldNode dataField = getChild("data");
-            if (dataField != null) {
-                dataField.setValue(value);
-                ByteBuffer buffer = (ByteBuffer) value;
-                setChildValue("size", buffer.limit());
-                return;
-            }
-            throw new RuntimeTypeException("Field is not an array");
+        	arrayField = this;
+        }
+        FieldNode dataField = arrayField.getChild("data");
+        if (dataField == null) {
+        	throw new RuntimeTypeException("Field is not an array");
         }
         
-        arrayField.setChildValue("data", value);
+        dataField.setValue(value);
+        ByteBuffer buffer = (ByteBuffer) value;
+        arrayField.setChildValue("size", buffer.limit());
     }
     
     public <T> T getChildArrayData(String name, Class<T> type) {

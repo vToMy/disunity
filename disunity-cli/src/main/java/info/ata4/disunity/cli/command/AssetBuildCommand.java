@@ -70,7 +70,9 @@ public class AssetBuildCommand extends SingleFileCommand {
 	@Override
 	public void handleFile(Path file) throws IOException {
 		if (originalAsset == null) {
-			originalAsset = file.resolveSibling(file.getFileName().toString().substring(1));
+			String fileName = file.getFileName().toString();
+			String originalAssetName = fileName.substring(0, fileName.length() - 1);
+			originalAsset = file.resolveSibling(originalAssetName);
 		}
 		if (outFile == null) {
 			outFile = file.resolveSibling(Paths.get("out.assets"));
