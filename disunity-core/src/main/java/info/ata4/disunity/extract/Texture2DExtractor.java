@@ -388,7 +388,7 @@ public class Texture2DExtractor extends AbstractAssetExtractor {
             }
 
             imageBuffer.rewind();
-        } if (tf == TextureFormat.RGB24) {
+        } else if (tf == TextureFormat.RGB24) {
             // convert RGB directly to BGR
             byte[] pixelOld = new byte[3];
             byte[] pixelNew = new byte[3];

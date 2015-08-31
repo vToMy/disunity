@@ -108,21 +108,8 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
 		
 		assert !buffer.hasRemaining();
 		
-		//since they were converted in extraction.
-		switch (tex.getTextureFormat()) {
-			case RGBA4444:
-			case ARGB4444:
-				tex.setTextureFormat(TextureFormat.RGBA32);
-				break;
+		buffer = convertToOriginalFormat(buffer, tex.getTextureFormat());
 				
-			case RGB565:
-				tex.setTextureFormat(TextureFormat.RGB24);
-				break;
-			default:
-				//All good.
-				break;
-		}
-		
 		return buffer;
 	}
 	
@@ -282,4 +269,123 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
         }
         return bpp;
 	}
+	
+    private ByteBuffer convertToOriginalFormat(ByteBuffer imageBuffer, TextureFormat tf) {
+        if (tf == TextureFormat.RGBA32 || tf == TextureFormat.ARGB32) {
+            // convert BGRA to ARGB and RGBA directly by swapping the bytes 
+            byte[] pixelOld = new byte[4];
+            byte[] pixelNew = new byte[4];
+            for (int i = 0; i < imageBuffer.capacity() / 4; i++) {
+                imageBuffer.mark();
+                imageBuffer.get(pixelOld);
+                
+                if (tf == TextureFormat.ARGB32) {
+                    // BGRA -> ARGB
+                    pixelNew[0] = pixelOld[3];
+                    pixelNew[1] = pixelOld[2];
+                    pixelNew[2] = pixelOld[1];
+                    pixelNew[3] = pixelOld[0];
+                } else {
+                    // BGRA -> RGBA 
+                    pixelNew[0] = pixelOld[2];
+                    pixelNew[1] = pixelOld[1];
+                    pixelNew[2] = pixelOld[0];
+                    pixelNew[3] = pixelOld[3];
+                }
+                
+                imageBuffer.reset();
+                imageBuffer.put(pixelNew);
+            }
+
+            imageBuffer.rewind();
+        } else if (tf == TextureFormat.RGB24) {
+            // convert BGR directly to RGB
+            byte[] pixelOld = new byte[3];
+            byte[] pixelNew = new byte[3];
+            for (int i = 0; i < imageBuffer.capacity() / 3; i++) {
+                imageBuffer.mark();
+                imageBuffer.get(pixelOld);
+                
+                pixelNew[0] = pixelOld[2];
+                pixelNew[1] = pixelOld[1];
+                pixelNew[2] = pixelOld[0];
+                
+                imageBuffer.reset();
+                imageBuffer.put(pixelNew);
+            }
+
+            imageBuffer.rewind();
+        } else if (tf == TextureFormat.ARGB4444 || tf == TextureFormat.RGBA4444) {
+            // convert 16 bit 32 bit BGRA to RGBA/ARGB
+            int newImageSize = imageBuffer.capacity() / 2;
+            ByteBuffer imageBufferNew = ByteBuffer.allocateDirect(newImageSize);
+            
+            byte[] pixelOld = new byte[4];
+            byte[] pixelNew = new byte[4];
+            for (int i = 0; i < imageBuffer.capacity() / 4; i++) {
+            	imageBuffer.get(pixelOld);
+            	
+            	if (tf == TextureFormat.ARGB4444) {
+                    // BGRA -> ARBG
+                    pixelNew[0] = pixelOld[3];
+                    pixelNew[1] = pixelOld[2];
+                    pixelNew[2] = pixelOld[1];
+                    pixelNew[3] = pixelOld[0];
+                } else {
+                    // BGRA -> RBGA 
+                    pixelNew[0] = pixelOld[2];
+                    pixelNew[1] = pixelOld[1];
+                    pixelNew[2] = pixelOld[0];
+                    pixelNew[3] = pixelOld[3];
+                }
+            	
+            	// convert range
+            	pixelNew[0] >>= 4;
+            	pixelNew[1] >>= 4;
+            	pixelNew[2] >>= 4;
+            	pixelNew[3] >>= 4;
+            	
+                short pixelNewShort = (short) ((pixelNew[0] << 12) & 0xf000);
+                pixelNewShort |= (short) ((pixelNew[1] << 8) & 0x0f00);
+                pixelNewShort |= (short) ((pixelNew[2] << 4) & 0x00f0);
+                pixelNewShort |= (short) (pixelNew[3] & 0x000f);
+                
+                imageBufferNew.asShortBuffer().put(pixelNewShort);
+            }
+            
+            assert !imageBuffer.hasRemaining();
+            assert !imageBufferNew.hasRemaining();
+            
+            imageBufferNew.rewind();
+            imageBuffer = imageBufferNew;
+        } else if (tf == TextureFormat.RGB565) {
+            // convert 24 bit to 16 bit RGB
+            int newImageSize = (imageBuffer.capacity() / 3) * 2;
+            ByteBuffer imageBufferNew = ByteBuffer.allocateDirect(newImageSize);
+            
+            byte[] pixel = new byte[3];
+            for (int i = 0; i < imageBuffer.capacity() / 2; i++) {
+            	imageBuffer.get(pixel);
+            	
+            	// fix color mapping (http://stackoverflow.com/a/9069480)
+            	pixel[0] = (byte) ((pixel[0] * 249 + 1014 ) >> 11);
+            	pixel[1] = (byte) ((pixel[1] * 253 +  505 ) >> 10);
+                pixel[2] = (byte) ((pixel[2] * 249 + 1014 ) >> 11);
+
+                short pixelNew = (short) ((pixel[0] << 11) & 0xf800);
+                pixelNew |= (short) ((pixel[1] << 5) & 0x07e0);
+                pixelNew |= (short) (pixel[2] & 0x001f);
+                
+                imageBufferNew.asShortBuffer().put(pixelNew);
+            }
+            
+            assert !imageBuffer.hasRemaining();
+            assert !imageBufferNew.hasRemaining();
+            
+            imageBufferNew.rewind();
+            imageBuffer = imageBufferNew;
+        }
+        
+        return imageBuffer;
+    }
 }
