@@ -271,6 +271,8 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
 	}
 	
     private ByteBuffer convertToOriginalFormat(ByteBuffer imageBuffer, TextureFormat tf) {
+        imageBuffer.rewind();
+        L.log(Level.FINE, "Converting {0} to {1}.", new Object[] {TextureFormat.BGRA32, tf});
         if (tf == TextureFormat.RGBA32 || tf == TextureFormat.ARGB32) {
             // convert BGRA to ARGB and RGBA directly by swapping the bytes 
             byte[] pixelOld = new byte[4];
@@ -316,7 +318,7 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
 
             imageBuffer.rewind();
         } else if (tf == TextureFormat.ARGB4444 || tf == TextureFormat.RGBA4444) {
-            // convert 16 bit 32 bit BGRA to RGBA/ARGB
+            // convert 32 bit BGRA to 16 bit RGBA/ARGB
             int newImageSize = imageBuffer.capacity() / 2;
             ByteBuffer imageBufferNew = ByteBuffer.allocateDirect(newImageSize);
             
@@ -345,12 +347,12 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
             	pixelNew[2] >>= 4;
             	pixelNew[3] >>= 4;
             	
-                short pixelNewShort = (short) ((pixelNew[0] << 12) & 0xf000);
-                pixelNewShort |= (short) ((pixelNew[1] << 8) & 0x0f00);
-                pixelNewShort |= (short) ((pixelNew[2] << 4) & 0x00f0);
-                pixelNewShort |= (short) (pixelNew[3] & 0x000f);
+                short pixelNewShort = (short) (((short)pixelNew[0] << 12) & 0xf000);
+                pixelNewShort |= (short) (((short)pixelNew[1] << 8) & 0x0f00);
+                pixelNewShort |= (short) (((short)pixelNew[2] << 4) & 0x00f0);
+                pixelNewShort |= (short) ((short)pixelNew[3] & 0x000f);
                 
-                imageBufferNew.asShortBuffer().put(pixelNewShort);
+                imageBufferNew.putShort(pixelNewShort);
             }
             
             assert !imageBuffer.hasRemaining();
@@ -372,11 +374,11 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
             	pixel[1] = (byte) ((pixel[1] * 253 +  505 ) >> 10);
                 pixel[2] = (byte) ((pixel[2] * 249 + 1014 ) >> 11);
 
-                short pixelNew = (short) ((pixel[0] << 11) & 0xf800);
-                pixelNew |= (short) ((pixel[1] << 5) & 0x07e0);
-                pixelNew |= (short) (pixel[2] & 0x001f);
+                short pixelNew = (short) (((short)pixel[0] << 11) & 0xf800);
+                pixelNew |= (short) (((short)pixel[1] << 5) & 0x07e0);
+                pixelNew |= (short) ((short)pixel[2] & 0x001f);
                 
-                imageBufferNew.asShortBuffer().put(pixelNew);
+                imageBufferNew.putShort(pixelNew);
             }
             
             assert !imageBuffer.hasRemaining();
