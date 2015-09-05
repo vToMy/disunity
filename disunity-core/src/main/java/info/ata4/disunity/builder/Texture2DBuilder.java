@@ -2,6 +2,7 @@ package info.ata4.disunity.builder;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -283,6 +284,7 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
             // convert 32 bit BGRA to 16 bit RGBA/ARGB
             int newImageSize = imageBuffer.capacity() / 2;
             ByteBuffer imageBufferNew = ByteBuffer.allocateDirect(newImageSize);
+            imageBufferNew.order(ByteOrder.LITTLE_ENDIAN);
             
             byte[] pixelOld = new byte[4];
             byte[] pixelNew = new byte[4];
@@ -326,6 +328,7 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
             // convert 24 bit to 16 bit RGB
             int newImageSize = (imageBuffer.capacity() / 3) * 2;
             ByteBuffer imageBufferNew = ByteBuffer.allocateDirect(newImageSize);
+            imageBufferNew.order(ByteOrder.LITTLE_ENDIAN);
             
             byte[] pixel = new byte[3];
             for (int i = 0; i < imageBuffer.capacity() / 2; i++) {
