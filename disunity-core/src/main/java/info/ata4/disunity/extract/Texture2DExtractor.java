@@ -115,7 +115,7 @@ public class Texture2DExtractor extends AbstractAssetExtractor {
         }
     }
     
-    private int getMipMapCount(int width, int height) {
+    public static int getMipMapCount(int width, int height) {
         int mipMapCount = 1;
         for (int dim = Math.max(width, height); dim > 1; dim /= 2) {
             mipMapCount++;

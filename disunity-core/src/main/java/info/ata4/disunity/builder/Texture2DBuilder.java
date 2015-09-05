@@ -5,11 +5,16 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.commons.lang3.tuple.Pair;
+
 import info.ata4.disunity.extract.Texture2DExtractor;
+import info.ata4.io.DataReaders;
 import info.ata4.io.buffer.ByteBufferUtils;
 import info.ata4.log.LogUtils;
 import info.ata4.unity.engine.texture2d.DDSHeader;
@@ -72,7 +77,7 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
         int mipMapCount = 1;
 		
         if (tex.isMipMap()) {
-            mipMapCount = getMipMapCount(tex.getWidth(), tex.getHeight());
+            mipMapCount = Texture2DExtractor.getMipMapCount(tex.getWidth(), tex.getHeight());
         }
 		
         List<ByteBuffer> byteBuffers = new ArrayList<>();
@@ -114,12 +119,6 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
 	}
 	
 	private ByteBuffer getKTXData(Texture2D tex) throws IOException {
-		int mipMapCount = 1;
-		
-        if (tex.isMipMap()) {
-            mipMapCount = getMipMapCount(tex.getWidth(), tex.getHeight());
-        }
-        
         String fileName = tex.getName() + "." + getTextureExtension(tex);
         Path filePath = inputDirectory.resolve(fileName);
 		if (!filePath.toFile().exists()) {
@@ -127,17 +126,54 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
 			return null;
 		}
         ByteBuffer data = ByteBuffer.wrap(Files.readAllBytes(filePath));
-        ByteBuffer buffer = ByteBuffer.allocate(data.limit() - KTXHeader.SIZE - mipMapCount * Integer.BYTES);
+        
+        KTXHeader header = new KTXHeader();
+        header.read(DataReaders.forByteBuffer(data));
+        
+        if (header.pixelWidth != tex.getWidth()) {
+        	L.log(Level.WARNING, "Packed texture width ({0}) is different from source texture width ({1}).", new Object[] {header.pixelWidth, tex.getWidth()});
+        }
+        tex.setWidth(header.pixelWidth);
+        if (header.pixelHeight != tex.getHeight()) {
+        	L.log(Level.WARNING, "Packed texture height ({0}) is different from source texture height ({1}).", new Object[] {header.pixelHeight, tex.getHeight()});
+        }
+        tex.setHeight(header.pixelHeight);
+        if (header.numberOfFaces != tex.getImageCount()) {
+        	L.log(Level.WARNING, "Packed texture image count ({0}) is different from source texture image count ({1}).", new Object[] {header.numberOfFaces, tex.getImageCount()});
+        }
+        tex.setImageCount(header.numberOfFaces);
+        if ((header.numberOfMipmapLevels > 1 && !tex.isMipMap()) || (header.numberOfFaces == 1 && tex.isMipMap())) {
+        	L.log(Level.WARNING, "Packed texture mipmap count is: {0}, while source is mipmap setting is: {1}.", new Object[] {header.numberOfMipmapLevels, tex.isMipMap()});
+        }
+        tex.setIsMipMap(header.numberOfMipmapLevels > 1);
+        
+        TextureFormat headerTextureFormat = ktxHeaderToTextureFormat.get(Pair.of(header.glInternalFormat,  header.glBaseInternalFormat));
+        if (headerTextureFormat == null) {
+        	throw new IOException(String.format("Unsupported texture format with glInternalFormat: %d, and glBaseInternalFormat: %d.", new Object[] {header.glInternalFormat, header.glBaseInternalFormat}));
+        }
+        if (headerTextureFormat != tex.getTextureFormat()) {
+        	L.log(Level.WARNING, "Packed texture format is {0}, while source texture format is: {1}.", new Object[] {headerTextureFormat, tex.getTextureFormat()});
+        }
+        tex.setTextureFormat(headerTextureFormat);
+               
+        ByteBuffer buffer = ByteBuffer.allocate(data.limit() - KTXHeader.SIZE - header.numberOfMipmapLevels * Integer.BYTES);
         
         int mipMapWidth = tex.getWidth();
         int mipMapHeight = tex.getHeight();
         int mipMapOffset = KTXHeader.SIZE;
-        for (int i = 0; i < mipMapCount; i++) {
+        Integer bpp = textureFormatToBbp.get(tex.getTextureFormat());
+        if (bpp == null) {
+        	throw new IOException(String.format("No bpp found for texture format: %s.", tex.getTextureFormat()));
+        }
+        for (int i = 0; i < header.numberOfMipmapLevels; i++) {
         	mipMapOffset += Integer.BYTES;
-        	int mipMapSize = (mipMapWidth * mipMapHeight * getBPP(tex)) / 8;
-        	buffer.put(ByteBufferUtils.getSlice(data, mipMapOffset, mipMapSize));
         	
-        	mipMapWidth /= 2;
+        	int mipMapSize = (mipMapWidth * mipMapHeight * bpp) / 8;
+        	ByteBuffer mipMapBuffer = ByteBufferUtils.getSlice(data, mipMapOffset, mipMapSize);
+        	
+        	buffer.put(mipMapBuffer);
+        	
+            mipMapWidth /= 2;
             mipMapHeight /= 2;
             mipMapOffset += mipMapSize;
         }
@@ -155,14 +191,6 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
 		ByteBuffer data = ByteBufferUtils.getSlice(ByteBuffer.wrap(Files.readAllBytes(filePath)),DDSHeader.SIZE);
 		return data;
 	}
-	
-    private int getMipMapCount(int width, int height) {
-        int mipMapCount = 1;
-        for (int dim = Math.max(width, height); dim > 1; dim /= 2) {
-            mipMapCount++;
-        }
-        return mipMapCount;
-    }
 	
 	private String getTextureExtension(Texture2D tex) throws IOException {
 		switch (tex.getTextureFormat()) {
@@ -202,72 +230,6 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
             throw new IOException(String.format("Texture2D {0}: Unsupported texture format {1}",
                     new Object[] {tex.getName(), tex.getTextureFormat()}));
 		}
-	}
-	
-	private int getBPP(Texture2D tex) {
-		int bpp;
-        
-        switch (tex.getTextureFormat()) {
-            case PVRTC_RGB2:
-                bpp = 2;
-                break;
-                
-            case PVRTC_RGBA2:
-                bpp = 2;
-                break;
-
-            case PVRTC_RGB4:
-                bpp = 4;
-                break;
-                
-            case PVRTC_RGBA4:
-                bpp = 4;
-                break;
-                
-            case ATC_RGB4:
-                bpp = 4;
-                break;
-
-            case ATC_RGBA8:
-                bpp = 8;
-                break;
-                
-            case ETC_RGB4:
-                bpp = 4;
-                break;
-                
-            case ETC2_RGB4:
-                bpp = 4;
-                break;
-                
-            case ETC2_RGB4_PUNCHTHROUGH_ALPHA:
-                bpp = 4;
-                break;
-                
-            case ETC2_RGBA8:
-                bpp = 8;
-                break;
-         
-            case EAC_R:
-                bpp = 4;
-                break;
-                
-            case EAC_R_SIGNED:
-                bpp = 4;
-                break;
-                
-            case EAC_RG:
-                bpp = 8;
-                break;
-                
-            case EAC_RG_SIGNED:
-                bpp = 4;
-                break;
-                
-            default:
-                throw new IllegalStateException("Invalid texture format for KTX: " + tex.getTextureFormat());
-        }
-        return bpp;
 	}
 	
     private ByteBuffer convertToOriginalFormat(ByteBuffer imageBuffer, TextureFormat tf) {
@@ -390,4 +352,38 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
         
         return imageBuffer;
     }
+    
+    private Map<Pair<Integer, Integer>, TextureFormat> ktxHeaderToTextureFormat = new HashMap<Pair<Integer, Integer>, TextureFormat>() {{
+    	put(Pair.of(KTXHeader.GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG, KTXHeader.GL_RGB), TextureFormat.PVRTC_RGB2);
+    	put(Pair.of(KTXHeader.GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG, KTXHeader.GL_RGBA), TextureFormat.PVRTC_RGBA2);
+    	put(Pair.of(KTXHeader.GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG, KTXHeader.GL_RGB), TextureFormat.PVRTC_RGB4);
+    	put(Pair.of(KTXHeader.GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG, KTXHeader.GL_RGBA), TextureFormat.PVRTC_RGBA4);
+    	put(Pair.of(KTXHeader.GL_ATC_RGB_AMD, KTXHeader.GL_RGB), TextureFormat.ATC_RGB4);
+    	put(Pair.of(KTXHeader.GL_ATC_RGBA_EXPLICIT_ALPHA_AMD, KTXHeader.GL_RGBA), TextureFormat.ATC_RGBA8);
+    	put(Pair.of(KTXHeader.GL_ETC1_RGB8_OES, KTXHeader.GL_RGB), TextureFormat.ETC_RGB4);
+    	put(Pair.of(KTXHeader.GL_COMPRESSED_RGB8_ETC2, KTXHeader.GL_RGB), TextureFormat.ETC2_RGB4);
+    	put(Pair.of(KTXHeader.GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2, KTXHeader.GL_RGBA), TextureFormat.ETC2_RGB4_PUNCHTHROUGH_ALPHA);
+    	put(Pair.of(KTXHeader.GL_COMPRESSED_RGBA8_ETC2_EAC, KTXHeader.GL_RGBA), TextureFormat.ETC2_RGBA8);
+    	put(Pair.of(KTXHeader.GL_COMPRESSED_R11_EAC, KTXHeader.GL_RED), TextureFormat.EAC_R);
+    	put(Pair.of(KTXHeader.GL_COMPRESSED_SIGNED_R11_EAC, KTXHeader.GL_RED), TextureFormat.EAC_R_SIGNED);
+    	put(Pair.of(KTXHeader.GL_COMPRESSED_RG11_EAC, KTXHeader.GL_RG), TextureFormat.EAC_RG);
+    	put(Pair.of(KTXHeader.GL_COMPRESSED_SIGNED_RG11_EAC, KTXHeader.GL_RG), TextureFormat.EAC_RG_SIGNED);
+	}};
+	
+	private Map<TextureFormat, Integer> textureFormatToBbp = new HashMap<TextureFormat, Integer>() {{
+		put(TextureFormat.PVRTC_RGB2, 2);
+		put(TextureFormat.PVRTC_RGBA2, 2);
+		put(TextureFormat.PVRTC_RGB4, 4);
+		put(TextureFormat.PVRTC_RGBA4, 4);
+		put(TextureFormat.ATC_RGB4, 4);
+		put(TextureFormat.ATC_RGBA8, 8);
+		put(TextureFormat.ETC_RGB4, 4);
+		put(TextureFormat.ETC2_RGB4, 4);
+		put(TextureFormat.ETC2_RGB4_PUNCHTHROUGH_ALPHA, 4);
+		put(TextureFormat.ETC2_RGBA8, 8);
+		put(TextureFormat.EAC_R, 4);
+		put(TextureFormat.EAC_R_SIGNED, 4);
+		put(TextureFormat.EAC_RG, 8);
+		put(TextureFormat.EAC_RG_SIGNED, 4);
+	}};
 }

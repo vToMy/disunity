@@ -25,20 +25,35 @@ public class Texture2D extends UnityObject {
         super(object);
     }
     
+    public static final String WIDTH_FIELD_NAME = "m_Width";
     public Integer getWidth() {
-        return object.getSInt32("m_Width");
+        return object.getSInt32(WIDTH_FIELD_NAME);
     }
     
+    public void setWidth(Integer width) {
+    	object.setSInt32(WIDTH_FIELD_NAME, width);
+    }
+    
+    public static final String HEIGHT_FIELD_NAME = "m_Height";
     public Integer getHeight() {
-        return object.getSInt32("m_Height");
+        return object.getSInt32(HEIGHT_FIELD_NAME);
+    }
+    
+    public void setHeight(Integer height) {
+    	object.setSInt32(HEIGHT_FIELD_NAME, height);
     }
     
     public long getCompleteImageSize() {
         return object.getUInt32("m_CompleteImageSize");
     }
     
+    public static final String TEXTURE_FORMAT_FIELD_NAME = "m_TextureFormat";
     public int getTextureFormatOrd() {
-    	return object.getSInt32("m_TextureFormat");
+    	return object.getSInt32(TEXTURE_FORMAT_FIELD_NAME);
+    }
+    
+    private void setTextureFormatOrd(int textureFormatOrd) {
+    	object.setSInt32(TEXTURE_FORMAT_FIELD_NAME, textureFormatOrd);
     }
     
     public TextureFormat getTextureFormat() {
@@ -46,11 +61,16 @@ public class Texture2D extends UnityObject {
     }
     
     public void setTextureFormat(TextureFormat textureFormat) {
-    	object.setSInt32("m_TextureFormat", textureFormat.ordinal()+1);
+    	setTextureFormatOrd(textureFormat.ordinal() + 1);
     }
+
     
+    public static final String IS_MIPMAP_FIELD_NAME = "m_MipMap";
     public boolean isMipMap() {
-    	return object.getBoolean("m_MipMap");
+    	return object.getBoolean(IS_MIPMAP_FIELD_NAME);
+    }
+    public void setIsMipMap(boolean isMipMap) {
+    	object.setBoolean(IS_MIPMAP_FIELD_NAME, isMipMap);
     }
    
     public boolean isReadable() {
@@ -61,8 +81,13 @@ public class Texture2D extends UnityObject {
     	return object.getBoolean("m_ReadAllowed");
     }
     
+    public static final String IMAGE_COUNT_FIELD_NAME = "m_ImageCount";
     public Integer getImageCount() {
-    	return object.getSInt32("m_ImageCount");
+    	return object.getSInt32(IMAGE_COUNT_FIELD_NAME);
+    }
+    
+    public void setImageCount(Integer imageCount) {
+    	object.setSInt32(IMAGE_COUNT_FIELD_NAME, imageCount);
     }
     
     public long getDimension() {
