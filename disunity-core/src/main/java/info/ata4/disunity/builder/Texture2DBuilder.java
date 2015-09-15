@@ -156,18 +156,19 @@ public class Texture2DBuilder extends AbstractAssetBuilder<Texture2DExtractor> {
         	L.log(Level.WARNING, "Packed texture format is {0}, while source texture format is: {1}.", new Object[] {headerTextureFormat, tex.getTextureFormat()});
         }
         tex.setTextureFormat(headerTextureFormat);
-               
-        ByteBuffer buffer = ByteBuffer.allocate(data.limit() - KTXHeader.SIZE - header.numberOfMipmapLevels * Integer.BYTES);
+        
+        int mipMapWidthFieldSize = Integer.BYTES;
+        ByteBuffer buffer = ByteBuffer.allocate(data.limit() - header.size() - header.numberOfMipmapLevels * mipMapWidthFieldSize);
         
         int mipMapWidth = tex.getWidth();
         int mipMapHeight = tex.getHeight();
-        int mipMapOffset = KTXHeader.SIZE;
+        int mipMapOffset = header.size();
         Integer bpp = textureFormatToBbp.get(tex.getTextureFormat());
         if (bpp == null) {
         	throw new IOException(String.format("No bpp found for texture format: %s.", tex.getTextureFormat()));
         }
         for (int i = 0; i < header.numberOfMipmapLevels; i++) {
-        	mipMapOffset += Integer.BYTES;
+        	mipMapOffset += mipMapWidthFieldSize;
         	
         	int mipMapSize = (mipMapWidth * mipMapHeight * bpp) / 8;
         	ByteBuffer mipMapBuffer = ByteBufferUtils.getSlice(data, mipMapOffset, mipMapSize);

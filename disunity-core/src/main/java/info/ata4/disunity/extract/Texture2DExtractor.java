@@ -580,7 +580,7 @@ public class Texture2DExtractor extends AbstractAssetExtractor {
         }
         
         // header + raw image data + mip map image sizes
-        int imageSizeTotal = KTXHeader.SIZE + tex.getImageBuffer().capacity() + header.numberOfMipmapLevels * 4;
+        int imageSizeTotal = header.size() + tex.getImageBuffer().capacity() + header.numberOfMipmapLevels * 4;
         ByteBuffer bb = ByteBuffer.allocateDirect(imageSizeTotal);
         
         // write header
